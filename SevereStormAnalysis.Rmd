@@ -1,0 +1,138 @@
+---
+title: "NOAA Database - Severe Storm Analysis"
+author: "Anil Kumar R"
+date: "5/6/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+### Data Processing - Includes "Obtain data from datasource", "Cleanup", "Prepare" for analysis
+1. Load libraries
+
+```{r }
+require(knitr)
+require(ggplot2)
+```
+
+2. Download & read the Storm Data Analysis file from https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2
+
+```{r }
+if(!file.exists("StormData.csv.bz2")) {
+        download.file(url="https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2","StormData.csv.bz2")
+}
+stormData <- read.csv("StormData.csv.bz2")
+```
+
+3. Explore the structure of data & understand
+```{r stormData}
+str(stormData)
+```
+This provided relevant data columns for our further analysis.
+
+4. For addressing the effect of events on, 
+human health --> the relevant data columns are EVTYPE, FATALITIES and INJURIES. 
+economy --> the relevant data columns are "PROPDMG", "PROPDMGEXP", "CROPDMG", 
+    "CROPDMGEXP"
+So these are loaded into a data frame called health & economy, and a summary of the data was calculated:
+```{r }
+health <- stormData[,c("EVTYPE","FATALITIES","INJURIES")]
+economy <- stormData[,c("EVTYPE","PROPDMG", "PROPDMGEXP", "CROPDMG", 
+    "CROPDMGEXP")]
+summary(health)
+summary(economy)
+```
+The subset of data with non-zero fatalities or injuries is extracted:
+```{r }
+health_nz = health[health$EVTYPE !=0 | health$FATALITIES !=0 | health$INJURIES !=0,1:3]
+```
+Property Exponents
+```{r }
+economy$PROPEXP[economy$PROPDMGEXP == "K"] <- 1000
+economy$PROPEXP[economy$PROPDMGEXP == "M"] <- 1e+06
+economy$PROPEXP[economy$PROPDMGEXP == ""] <- 1
+economy$PROPEXP[economy$PROPDMGEXP == "B"] <- 1e+09
+economy$PROPEXP[economy$PROPDMGEXP == "m"] <- 1e+06
+economy$PROPEXP[economy$PROPDMGEXP == "0"] <- 1
+economy$PROPEXP[economy$PROPDMGEXP == "5"] <- 1e+05
+economy$PROPEXP[economy$PROPDMGEXP == "6"] <- 1e+06
+economy$PROPEXP[economy$PROPDMGEXP == "4"] <- 10000
+economy$PROPEXP[economy$PROPDMGEXP == "2"] <- 100
+economy$PROPEXP[economy$PROPDMGEXP == "3"] <- 1000
+economy$PROPEXP[economy$PROPDMGEXP == "h"] <- 100
+economy$PROPEXP[economy$PROPDMGEXP == "7"] <- 1e+07
+economy$PROPEXP[economy$PROPDMGEXP == "H"] <- 100
+economy$PROPEXP[economy$PROPDMGEXP == "1"] <- 10
+economy$PROPEXP[economy$PROPDMGEXP == "8"] <- 1e+08
+
+economy$PROPEXP[economy$PROPDMGEXP == "+"] <- 0
+economy$PROPEXP[economy$PROPDMGEXP == "-"] <- 0
+economy$PROPEXP[economy$PROPDMGEXP == "?"] <- 0
+
+economy$PROPDMGVAL <- economy$PROPDMG * economy$PROPEXP
+```
+Crop Exponents
+```{r }
+economy$CROPEXP[economy$CROPDMGEXP == "M"] <- 1e+06
+economy$CROPEXP[economy$CROPDMGEXP == "K"] <- 1000
+economy$CROPEXP[economy$CROPDMGEXP == "m"] <- 1e+06
+economy$CROPEXP[economy$CROPDMGEXP == "B"] <- 1e+09
+economy$CROPEXP[economy$CROPDMGEXP == "0"] <- 1
+economy$CROPEXP[economy$CROPDMGEXP == "k"] <- 1000
+economy$CROPEXP[economy$CROPDMGEXP == "2"] <- 100
+economy$CROPEXP[economy$CROPDMGEXP == ""] <- 1
+economy$CROPEXP[economy$CROPDMGEXP == "?"] <- 0
+economy$CROPDMGVAL <- economy$CROPDMG * economy$CROPEXP
+```
+And sub-totals of fatalities by event type calculated, along with economy data
+```{r }
+fatalities <- aggregate(FATALITIES ~ EVTYPE, data = health_nz, FUN = sum)
+injuries<- aggregate(INJURIES ~ EVTYPE, data = health_nz, FUN = sum)
+prop_dam <- aggregate(PROPDMGVAL ~ EVTYPE, data = economy, FUN = sum)
+crop_dam <- aggregate(CROPDMGVAL ~ EVTYPE, data = economy, FUN = sum)
+```
+Pick Top 20 Events by Fatalities & Top 20 Economic Damages
+```{r }
+fatalities_20 <- fatalities[order(-fatalities$FATALITIES), ][1:20, ]
+injuries_20 <- injuries[order(-injuries$INJURIES), ][1:20, ]
+prop_dam20 <- prop_dam[order(-prop_dam$PROPDMGVAL), ][1:20, ]
+crop_dam20 <- crop_dam[order(-crop_dam$CROPDMGVAL), ][1:20, ]
+```
+
+### Results 
+#### Question1: Across the United States, which types of events are most harmful with respect to population health?
+#### Analysis for Major causes of Fatalities & Injuries
+Plot the bar
+```{r }
+par(mfrow = c(1, 2), mar = c(10, 4, 3, 2), mgp = c(3, 1, 0), cex = 0.8)
+barplot(fatalities_20$FATALITIES, las = 3, names.arg = fatalities_20$EVTYPE, main = "Top 20 Fatalities by Weather Events",
+    ylab = "Total Fatalities", col = "red")
+barplot(injuries_20$INJURIES, las = 3, names.arg = injuries_20$EVTYPE, main = "Top 20 Injuries by Weather Events", 
+    ylab = "Total Injuries", col = "blue")
+dev.copy(png,file="barplot_health.png")
+dev.off()
+```
+
+Based on the above graph depiction, `r fatalities_20$EVTYPE[1]` dominates the FATALITIES
+
+#### Question2: Across the United States, Across the United States, which types of events have the greatest economic consequences?
+#### Analysis for calamities that cause Major economic losses
+```{r }
+par(mfrow = c(1, 2), mar = c(10, 4, 3, 2), mgp = c(3, 1, 0), cex = 0.8)
+barplot(prop_dam20$PROPDMGVAL/(10^9), las = 3, names.arg = prop_dam20$EVTYPE, 
+    main = "Top 20 Property Damage caused by Weather Events", ylab = "Cost in billions", 
+    col = "red")
+barplot(crop_dam20$CROPDMGVAL/(10^9), las = 3, names.arg = crop_dam20$EVTYPE, 
+    main = "Top 20 Crop Damages by Weather Events", ylab = "Cost in Billions", 
+    col = "blue")
+dev.copy(png,file="barplot_economy.png")
+dev.off()
+```
+Based on the above graph depiction, `r prop_dam20$EVTYPE[1]` dominates the Property losses & `r crop_dam20$EVTYPE[1]` dominates the Crop losses

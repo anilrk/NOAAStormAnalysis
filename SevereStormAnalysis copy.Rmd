@@ -1,0 +1,83 @@
+---
+title: "NOAA Database - Severe Storm Analysis"
+author: "Anil Kumar R"
+date: "5/6/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+### Section1: Data Preparation - Obtain data from datasource for analysis
+* Load libraries
+
+```{r }
+require(knitr)
+require(ggplot2)
+```
+
+* Download & read the Storm Data Analysis file from https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2
+
+```{r }
+if(!file.exists("StormData.csv.bz2")) {
+        download.file(url="https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2","StormData.csv.bz2")
+}
+stormData <- read.csv("StormData.csv.bz2")
+```
+
+* Explore the structure of data & understand
+```{r stormData}
+str(stormData)
+```
+This provided relevant data columns for our further analysis.
+
+### Section2: Questions & Results 
+#### Question1: Across the United States, which types of events are most harmful with respect to population health?
+#### Analysis for Major causes of Fatalities & Injuries
+For addressing the effect of events on human health, the relevant data columns are EVTYPE, FATALITIES and INJURIES. So these are loaded into a data frame called health, and a summary of the data was calculated:
+```{r }
+health <- stormData[,c("EVTYPE","FATALITIES","INJURIES")]
+summary(health)
+```
+The subset of data with non-zero fatalities or injuries is extracted:
+```{r }
+health_nz = health[health$FATALITIES !=0 | health$INJURIES !=0,1:3]
+```
+And sub-totals of fatalities by event type calculated:
+```{r }
+fatalbyevent<-with(health_nz,aggregate(FATALITIES,by=list(EVTYPE),sum))
+names(fatalbyevent)<- c("EVTYPE","FATALITIES")
+```
+Pick Top 20 Events by Fatalities
+```{r }
+num=20
+rankedfatal=fatalbyevent[order(fatalbyevent$FATALITIES,decreasing =TRUE),]
+topfatal=head(rankedfatal,num)
+```
+Plot the bar
+```{r }
+barplot(topfatal$FATALITIES,width=2,space=2,topfatal$EVTYPE,cex.axis=0.75,cex.names=0.5,las=2,col=c("lightblue"),main="Fatalities by Event type")
+```
+
+
+The above graph depicts {r topfatal$FATALITIES[1]} dominates the FATALITIES
+
+
+### Section3: Summary
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
